@@ -15,15 +15,20 @@
             乌龟正在思考<span class="dots"><span>.</span><span>.</span><span>.</span></span>
           </template>
           <template v-else>
-            {{ msg.content }}
+            <div v-html="msg.content"></div>
+            <span v-if="num !== null && msg.role === 'system'"
+              style="display: block; font-size: 12px; color: #666; margin-top: 4px; font-style: italic;">
+              剩余次数：{{ num }}
+            </span>
           </template>
         </div>
       </div>
     </div>
 
     <div class="input-area">
-      <input v-model="userInput" type="text" class="input" placeholder="输入你的推理..." @keyup.enter="submit" />
-      <button class="send-btn" @click="submit">发送</button>
+      <input v-model="userInput" type="text" class="input" placeholder="输入你的推理..." @keyup.enter="submit"
+        :disabled="isGameOver" />
+      <button class="send-btn" @click="submit" :disabled="isGameOver">发送</button>
     </div>
   </div>
 </template>
@@ -46,8 +51,7 @@ export default {
       userInput: "",
       isThinking: false,
       nickname: sessionStorage.getItem('turtleSoupNickname') || '游客',
-      chatList: [
-      ],
+      chatList: [],
       user_token: '',
       sess_token: '',
       title_data: {},
@@ -55,22 +59,99 @@ export default {
       storyId: '',
       newStoryArr: [],
       showSuccessModal: false,
-      showFailModal: false
+      showFailModal: false,
+      isGameOver: false,
+      num: null
     };
   },
+  created() {
+    // 从 localStorage 读取数据
+    const savedChatList = localStorage.getItem('turtleSoupChatList')
+    const savedNewStoryArr = localStorage.getItem('turtleSoupNewStoryArr')
+
+    if (savedChatList) {
+      this.chatList = JSON.parse(savedChatList)
+    }
+    if (savedNewStoryArr) {
+      this.newStoryArr = JSON.parse(savedNewStoryArr)
+    }
+  },
+  watch: {
+    // 监听数组变化，保存到 localStorage
+    chatList: {
+      handler(newVal) {
+        localStorage.setItem('turtleSoupChatList', JSON.stringify(newVal))
+      },
+      deep: true
+    },
+    newStoryArr: {
+      handler(newVal) {
+        localStorage.setItem('turtleSoupNewStoryArr', JSON.stringify(newVal))
+      },
+      deep: true
+    },
+    // 监听游戏状态变化
+    isGameOver: {
+      handler(newVal) {
+        localStorage.setItem('turtleSoupGameOver', JSON.stringify(newVal))
+      }
+    },
+    // 监听剩余次数变化
+    num: {
+      handler(newVal) {
+        if (newVal !== null) {
+          localStorage.setItem('turtleSoupRemainingTries', JSON.stringify(newVal))
+        }
+      }
+    }
+  },
   async mounted() {
-    this.user_token = localStorage.getItem('active_token')
-    const data = await getTitle({
-      "activityToken": this.user_token
+    // 从 localStorage 恢复聊天记录
+    const savedChatList = localStorage.getItem('turtleSoupChatList')
+    const savedNewStoryArr = localStorage.getItem('turtleSoupNewStoryArr')
+    const savedToken = localStorage.getItem('turtleSoupToken')
+    const savedGameOver = localStorage.getItem('turtleSoupGameOver')
+    const savedRemainingTries = localStorage.getItem('turtleSoupRemainingTries')
+    
+    if (savedChatList) {
+      this.chatList = JSON.parse(savedChatList)
+    } else {
+      // 如果没有保存的聊天记录，则显示初始故事
+      this.title_data = { ...this.$route.query }
+      this.storyId = this.title_data.storyId
+      this.chatList = [{
+        role: 'system',
+        content: this.title_data.surface
+      }]
+    }
+
+    if (savedNewStoryArr) {
+      this.newStoryArr = JSON.parse(savedNewStoryArr)
+    }
+
+    // 恢复 token
+    if (savedToken) {
+      this.title_data.token = savedToken
+    } else if (this.$route.query.token) {
+      // 如果是新进入的，保存 token
+      this.title_data.token = this.$route.query.token
+      localStorage.setItem('turtleSoupToken', this.$route.query.token)
+    }
+
+    // 恢复游戏状态
+    if (savedGameOver) {
+      this.isGameOver = JSON.parse(savedGameOver)
+    }
+
+    // 恢复剩余次数
+    if (savedRemainingTries) {
+      this.num = JSON.parse(savedRemainingTries)
+    }
+
+    // 滚动到底部
+    this.$nextTick(() => {
+      this.scrollToBottom()
     })
-    console.log(data);
-    if (data.code != 200) return this.$refs.toast.show(data.message)
-    this.title_data = data.data
-    this.storyId = data.data.storyId
-    this.chatList = [{
-      role: 'system',
-      content: data.data.surface
-    }]
   },
   methods: {
     async submit() {
@@ -87,40 +168,59 @@ export default {
       this.newStoryArr.push({ role: "user", content: text });
       this.userInput = "";
       this.scrollToBottom();
-      
+
       // 开始"思考"
       this.isThinking = true;
       this.input_flag = false;
-      
+
       // 添加思考状态消息
-      this.chatList.push({ 
-        role: "system", 
+      this.chatList.push({
+        role: "system",
         content: "乌龟正在思考...",
-        isThinking: true 
+        isThinking: true
       });
       this.scrollToBottom();
-      
+
       const data = await submitAnswer({
         "sessionToken": this.title_data.token,
         "messages": [...this.newStoryArr]
       })
-      
+
       this.input_flag = true;
       this.isThinking = false;
-      
+
       if (data.code != 200) return this.$refs.toast.show(data.message)
-      
+
       // 移除思考状态消息
       this.chatList = this.chatList.filter(msg => !msg.isThinking);
-      
-      // 判断是否开启新的故事
+      this.num = data.data.remainingTries
       if (data.data.isCorrect) {
         this.showSuccessModal = true
+        this.isGameOver = true  // 游戏结束，禁用输入
+        this.newStoryArr.push({
+          role: "system",
+          content: data.data.reply
+        });
+        this.chatList.push({
+          role: "system",
+          content: data.data.reply
+        });
       } else if (
+        // 是否还有次数
         data.data.remainingAnswers == 0 && data.data.remainingTries == 0 && data.data.isCorrect == false
       ) {
         this.showFailModal = true
+        this.isGameOver = true  // 游戏结束，禁用输入
+        this.newStoryArr.push({
+          role: "system",
+          content: data.data.reply
+        });
+        this.chatList.push({
+          role: "system",
+          content: data.data.reply
+        });
       }
+      // 判断是否开启新的故事
       else if (data.data.newStoryId != 0) {
         // 清空数据
         this.newStoryArr = []
@@ -142,7 +242,7 @@ export default {
           content: data.data.reply
         });
       }
-      
+
       this.scrollToBottom();
     },
     scrollToBottom() {
@@ -150,6 +250,17 @@ export default {
         const el = this.$refs.chatBox;
         el.scrollTop = el.scrollHeight;
       });
+    },
+    clearChat() {
+      this.chatList = []
+      this.newStoryArr = []
+      this.isGameOver = false
+      this.num = null
+      localStorage.removeItem('turtleSoupChatList')
+      localStorage.removeItem('turtleSoupNewStoryArr')
+      localStorage.removeItem('turtleSoupToken')
+      localStorage.removeItem('turtleSoupGameOver')
+      localStorage.removeItem('turtleSoupRemainingTries')
     }
   }
 };
@@ -239,6 +350,7 @@ export default {
   from {
     opacity: 0;
   }
+
   to {
     opacity: 1;
   }
@@ -288,6 +400,12 @@ export default {
   color: #94a3b8;
 }
 
+.input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
 .send-btn {
   background: #818cf8;
   color: #ffffff;
@@ -306,6 +424,12 @@ export default {
 
 .send-btn:active {
   background: #4f46e5;
+}
+
+.send-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 /* 打字动画样式 */
@@ -329,9 +453,12 @@ export default {
 }
 
 @keyframes blink {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.3;
   }
+
   50% {
     opacity: 1;
   }
@@ -342,6 +469,7 @@ export default {
     opacity: 0;
     transform: translateY(4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);

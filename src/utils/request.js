@@ -4,7 +4,7 @@ import serverConfig from "./baseUrl";
 // 创建 axios 请求实例
 const serviceAxios = axios.create({
   baseURL: serverConfig.baseURL, // 基础请求地址
-  timeout: 180000, // 请求超时设置
+  timeout: 600000, // 请求超时设置（10分钟）
   withCredentials: false, // 跨域请求是否需要携带 cookie
   headers: {
     'Content-Type': 'application/json',
