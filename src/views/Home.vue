@@ -193,7 +193,7 @@ export default {
 
       // 移除思考状态消息
       this.chatList = this.chatList.filter(msg => !msg.isThinking);
-      this.num = data.data.remainingTries
+      this.num = data.data.remainingAnswers
       if (data.data.isCorrect) {
         this.showSuccessModal = true
         this.isGameOver = true  // 游戏结束，禁用输入
