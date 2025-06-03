@@ -76,6 +76,7 @@ export default {
                 console.log('Token已保存到本地:', activeToken)
             } else {
                 this.$refs.toast.show('请重新扫码')
+                this.$router.push('/admin')
             }
         },
         async startGame() {

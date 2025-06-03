@@ -2,8 +2,8 @@
     <div class="admin-container">
         <div v-if="showPasswordModal" class="password-modal">
             <div class="modal-content">
-                <h2>请输入密码</h2>
-                <input type="password" v-model="password" @keyup.enter="checkPassword" placeholder="请输入密码">
+                <h2>请输入monad</h2>
+                <input type="password" v-model="password" @keyup.enter="checkPassword" placeholder="请输入monad">
                 <button @click="checkPassword">确认</button>
                 <p v-if="showError" class="error-message">密码错误，请重试</p>
             </div>

@@ -106,6 +106,12 @@ export default {
     }
   },
   async mounted() {
+    // 检查token是否存在，不存在则跳转到/admin
+    if (!localStorage.getItem('turtleSoupToken')) {
+      this.$router.push('/admin')
+      return
+    }
+
     // 从 localStorage 恢复聊天记录
     const savedChatList = localStorage.getItem('turtleSoupChatList')
     const savedNewStoryArr = localStorage.getItem('turtleSoupNewStoryArr')

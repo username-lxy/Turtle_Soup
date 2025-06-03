@@ -10,7 +10,7 @@ module.exports = {
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://turtlesoup-api.monadshow.xyz',
+        target: 'https://turtlesoup-api.monadshow.xyz',
         changeOrigin: true,
         pathRewrite: {
           '^/api': '/api'
